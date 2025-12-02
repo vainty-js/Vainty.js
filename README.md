@@ -72,13 +72,4 @@ client.on('message', msg => {
 client.login('token');
 ```
 
-## 📚 Documentation
-- [Discord API Docs](https://discordapp.com/developers/docs/intro)  
-- Guide d’utilisation et exemples inclus dans le repo  
-
-## 🤝 Contributing
-Les PR sont les bienvenues. Avant de proposer une modification, vérifiez que l’idée n’a pas déjà été soumise.  
-Respectez la philosophie du projet : **minimalisme, robustesse et ergonomie**.
-
-## 🆘 Support
-En cas de problème ou pour des questions, ouvrez une issue sur le repo ou contactez via Discord.
+## Documentation (Coming Soon)
