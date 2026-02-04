@@ -17,6 +17,10 @@ class APIRequest {
     this.route = this.getRoute(this.path);
     this.reason = reason;
     this.contextmenu = contextmenu;
+
+    this.fullUserAgent = this.client.options.http.headers['User-Agent'];
+
+    this.client.options.ws.properties.browser_user_agent = this.fullUserAgent;
   }
 
   getRoute(url) {
@@ -59,7 +63,7 @@ class APIRequest {
 
     options.tls = {
       ciphers: Constants.ciphers.join(':'),
-      rejectUnauthorized: false, 
+      rejectUnauthorized: false,
       secureProtocol: 'TLSv1_2_method'
     };
 
@@ -72,10 +76,11 @@ class APIRequest {
     const proxyUrl = this.getProxyConfig();
 
     const headers = {
+      'priority': 'u=1, i',
       'authority': 'discord.com',
       'accept': '*/*',
       'accept-language': 'en-US',
-      'sec-ch-ua': '"Not?A_Brand";v="8", "Chromium";v="126"',
+      'sec-ch-ua': '"Not:A-Brand";v="24", "Chromium";v="134"',
       'sec-ch-ua-mobile': '?0',
       'sec-ch-ua-platform': '"Windows"',
       'sec-fetch-dest': 'empty',
@@ -83,7 +88,12 @@ class APIRequest {
       'sec-fetch-site': 'same-origin',
       'X-Debug-Options': 'bugReporterEnabled',
       'X-Discord-Locale': 'en-US',
-      'X-Discord-Timezone': 'Europe/Paris'
+      'referer': 'https://discord.com/channels/@me',
+      'origin': 'https://discord.com',
+      'x-super-properties': `${Buffer.from(JSON.stringify(this.client.options.ws.properties), 'ascii').toString('base64',)}`,
+      'X-Discord-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+      'User-Agent': this.fullUserAgent,
+      ...this.client.options.http.headers
     };
 
     if (this.reason) headers['X-Audit-Log-Reason'] = encodeURIComponent(this.reason);
@@ -110,7 +120,7 @@ class APIRequest {
     const options = {
       method: this.method.toUpperCase(),
       headers,
-      timeout: 15000, 
+      timeout: 15000,
       redirect: 'follow',
       credentials: 'include'
     };
