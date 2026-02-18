@@ -1202,6 +1202,25 @@ class RESTMethods {
     return this.rest.makeRequest('patch', Constants.Endpoints.User('@me').settings, true, data);
   }
 
+  /**
+   * PATCH /users/@me/settings — updates only the custom status (similar to updateCurrentUser for the profile).
+   * Synchronizes the custom status on the Discord account, visible both on the local app and on other clients.
+   * @param {Object} payload { text, emoji_name, emoji_id, expires_at } or null to clear it
+   * @returns {Promise<Object>}
+   */
+  patchCustomStatus(payload) {
+    return this.rest.makeRequest('patch', Constants.Endpoints.User('@me').settings, true, { custom_status: payload });
+  }
+
+  /**
+   * PATCH /users/@me/settings-proto/{type} — body: { settings: base64 }
+   * Updates the settings using the proto format (1 = PreloadedUserSettings). 
+   * A single request updates both status and custom status (for the local client and for others).
+   */
+  patchUserSettingsProto(type, base64Settings) {
+    return this.rest.makeRequest('patch', Constants.Endpoints.User('@me').settingsProto(type), true, { settings: base64Settings });
+  }
+
   patchClientUserGuildSettings(guildID, data) {
     return this.rest.makeRequest('patch', Constants.Endpoints.User('@me').Guild(guildID).settings, true, data);
   }

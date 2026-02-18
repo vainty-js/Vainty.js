@@ -147,6 +147,7 @@ const Endpoints = exports.Endpoints = {
       profile: `${base}/profile`,
       relationships: `${base}/relationships`,
       settings: `${base}/settings`,
+      settingsProto: type => `${base}/settings-proto/${type}`,
       pomeloattempt: `${base}/pomelo-attempt`,
       Relationship: uID => `${base}/relationships/${uID}`,
       boosts: `${base}/guilds/premium/subscription-slots`,
@@ -729,6 +730,13 @@ exports.UserSettingsMap = {
    * @type {PresenceStatus}
    */
   status: 'status',
+
+  /**
+   * Custom status (text + emoji) synced across clients
+   * @name ClientUserSettings#customStatus
+   * @type {?Object}
+   */
+  custom_status: 'customStatus',
 
   /**
    * Display currently running game as status message

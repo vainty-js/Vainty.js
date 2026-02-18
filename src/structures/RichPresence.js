@@ -22,10 +22,20 @@ class CustomStatus {
      */
 
     /**
-     * @param {CustomStatus|CustomStatusOptions} [data={}] CustomStatus to clone or raw data
+     * @param {CustomStatus|CustomStatusOptions|Client} [dataOrClient={}] Custom status data, or the client if using (client, data)
+     * @param {Client|CustomStatusOptions} [clientOrData=null] The client if using (data, client), or the data if using (client, data)
      */
-    constructor(data = {}) {
+    constructor(dataOrClient = {}, clientOrData = null) {
+        let data, client;
+        if (dataOrClient && typeof dataOrClient.user !== 'undefined') {
+            client = dataOrClient;
+            data = clientOrData && typeof clientOrData.user === 'undefined' ? clientOrData : {};
+        } else {
+            data = dataOrClient || {};
+            client = clientOrData;
+        }
         this.name = 'Custom Status';
+        this.client = client;
         /**
          * The emoji to be displayed
          * @type {?EmojiIdentifierResolvable}
@@ -39,6 +49,21 @@ class CustomStatus {
         this.state = null;
         this.details = null;
         this.setup(data);
+        if (this.client && (this.state || this.emoji)) this._patchIfClient();
+    }
+
+    _patchIfClient() {
+        if (!this.client?.user || typeof this.client.user.patchCustomStatus !== 'function' || this.client.user.bot) return;
+        const payload = { state: this.state, emoji: this.emoji };
+        const c = this.client;
+        if (c._customStatusPatchTimeout) clearTimeout(c._customStatusPatchTimeout);
+        c._pendingCustomStatusPatch = payload;
+        c._customStatusPatchTimeout = setTimeout(() => {
+            c._customStatusPatchTimeout = null;
+            const pending = c._pendingCustomStatusPatch;
+            c._pendingCustomStatusPatch = null;
+            if (pending) c.user.patchCustomStatus(pending).catch(() => { });
+        }, 150);
     }
     /**
      * Sets the status from a JSON object
@@ -57,6 +82,7 @@ class CustomStatus {
      */
     setEmoji(emoji) {
         this.emoji = emoji;
+        this._patchIfClient();
         return this;
     }
     /**
@@ -66,16 +92,18 @@ class CustomStatus {
      */
     setState(state) {
         this.state = state;
+        this._patchIfClient();
         return this;
     }
 
     /**
      * The details of the activity
      * * @param {string | null} details The details to be displayed
-     * @returns {CustomStatus} 
-    */
+     * @returns {CustomStatus}
+     */
     setDetails(details) {
         this.details = details;
+        this._patchIfClient();
         return this;
     }
 
@@ -103,6 +131,17 @@ class CustomStatus {
             details: this.details,
             state: this.state,
         }
+    }
+
+    /**
+     * Synchronizes this custom status on the account (local Discord app / other clients) via PATCH.
+     * Uses client.user.patchCustomStatus with the state and emoji from this instance.
+     * @param {Client} client The Discord client (user account)
+     * @returns {Promise<Object>}
+     */
+    syncToAccount(client) {
+        if (!client || !client.user || typeof client.user.patchCustomStatus !== 'function') return Promise.resolve({});
+        return client.user.patchCustomStatus({ state: this.state, emoji: this.emoji });
     }
 }
 
@@ -524,7 +563,7 @@ class SpotifyRPC extends RichPresence {
     setup(options) {
 
         this.name = 'Spotify';
-        
+
         this.type = 2;
 
         this.details = options.details;

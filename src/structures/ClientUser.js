@@ -127,6 +127,48 @@ class ClientUser extends User {
   }
 
   /**
+   * Request 1 — REST PATCH /users/@me/settings (custom_status).
+   * Synchronizes the custom status on the account; Discord pushes the update to all other active clients (Desktop, mobile, etc.).
+   * Does NOT send presence on this connection (for that, use setPresence2 or setCustomStatus).
+   * @param {Object} [data] { state, emoji } or null to clear it. emoji: { name, id?, animated? }
+   * @returns {Promise<Object>} API response
+   */
+  patchCustomStatus(data) {
+    if (this.bot) return Promise.resolve({});
+    const payload = !data || (!data.state && !data.emoji)
+      ? null
+      : {
+        text: data.state ?? null,
+        emoji_name: data.emoji?.name ?? null,
+        emoji_id: data.emoji?.id ?? null,
+        expires_at: null,
+      };
+    return this.client.rest.methods.patchCustomStatus(payload);
+  }
+
+  /**
+   * Updates the account-level custom status via PATCH /users/@me/settings (similar to updateCurrentUser for the profile),
+   * then applies the presence on this connection.
+   * @param {Object} [data] { state, emoji } or null to clear it. emoji: { name, id?, animated? }
+   * @returns {Promise<ClientUser>}
+   */
+  updateCustomStatus(data) {
+    if (this.bot) return Promise.resolve(this);
+    const payload = !data || (!data.state && !data.emoji)
+      ? null
+      : {
+        text: data.state ?? null,
+        emoji_name: data.emoji?.name ?? null,
+        emoji_id: data.emoji?.id ?? null,
+        expires_at: null,
+      };
+    return this.client.rest.methods.patchCustomStatus(payload).then(() => {
+      this.custom_status = data || null;
+      return this.setPresence({});
+    });
+  }
+
+  /**
    * Set the username of the logged in client.
    * <info>Changing usernames in Discord is heavily rate limited, with only 2 requests
    * every hour. Use this sparingly!</info>
@@ -381,13 +423,25 @@ class ClientUser extends User {
       if (data.activities) {
         data.activities = data.activities.map(activity => {
           if ([Constants.ActivityTypes.CUSTOM_STATUS].includes(activity.type)) {
-            return new CustomStatus(activity)
+            return new CustomStatus(activity, this.client)
           } else if (activity.id == "spotify:1") {
             return new SpotifyRPC(this, activity)
           } else {
             return new RichPresence(this, activity)
           }
-        })
+        });
+        const customActivity = data.activities.find(a => a.type === Constants.ActivityTypes.CUSTOM_STATUS);
+        if (!this.bot && this.settings) {
+          const payload = customActivity
+            ? {
+              text: customActivity.state ?? null,
+              emoji_name: customActivity.emoji?.name ?? null,
+              emoji_id: customActivity.emoji?.id ?? null,
+              expires_at: null,
+            }
+            : null;
+          this.settings.update('custom_status', payload);
+        }
       }
 
       if (typeof data.afk !== 'undefined') afk = data.afk;
@@ -397,39 +451,70 @@ class ClientUser extends User {
       this.localPresence.since = 0;
       this.localPresence.game = this.localPresence.game || null;
 
-      this.client.ws.send({
-        op: 3,
-        d: {
-          afk: this.localPresence.afk,
-          since: this.localPresence.since,
-          status: this.localPresence.status,
-          activities: data.activities
-        },
+      const activitiesPayload = data.activities
+        ? data.activities.map(activity => {
+          if (activity.type !== Constants.ActivityTypes.CUSTOM_STATUS) return activity;
+          return typeof activity.toPresencePayload === 'function' ? activity.toPresencePayload() : activity;
+        })
+        : this.activities;
+
+      const customActivity = data.activities && data.activities.find(a => a.type === Constants.ActivityTypes.CUSTOM_STATUS);
+      const restPromise = !this.bot && data.activities
+        ? this.patchCustomStatus(customActivity ? { state: customActivity.state, emoji: customActivity.emoji } : null)
+        : Promise.resolve();
+
+      restPromise.then(() => {
+        this.client.ws.send({
+          op: 3,
+          d: {
+            afk: this.localPresence.afk,
+            since: this.localPresence.since,
+            status: this.localPresence.status,
+            activities: activitiesPayload,
+          },
+        });
+        this.client._setPresence(this.id, this.localPresence);
+        resolve(this);
+      }).catch(() => {
+        this.client.ws.send({
+          op: 3,
+          d: {
+            afk: this.localPresence.afk,
+            since: this.localPresence.since,
+            status: this.localPresence.status,
+            activities: activitiesPayload,
+          },
+        });
+        this.client._setPresence(this.id, this.localPresence);
+        resolve(this);
       });
-
-      this.client._setPresence(this.id, this.localPresence);
-
-      resolve(this);
     });
   }
 
   /**
-   * Set a custom status.
+   * Sets the custom status with a single REST request (PATCH /users/@me/settings).
+   * Synchronizes it on the account → visible on all clients (Desktop, mobile, etc.).
+   * Does NOT send presence (Gateway OP 3) on this connection.
    * @param {customStatus} data The custom status.
-   * @example 
+   * @returns {Promise<Object>} API response
+   * @example
    * client.user.setCustomStatus({
-   *  emoji: {
-   *    id: null,
-   *    name: "💡",
-   *    animated: false
-   *  },
-   *  name: "Custom Status",
-   *  state: "With vainty.js"
+   *   emoji: { id: null, name: "💡", animated: false },
+   *   state: "With vainty.js"
    * })
    */
   setCustomStatus(data) {
-    this.custom_status = data
-    return this.setPresence({})
+    this.custom_status = data;
+    const payload = !data || (!data.state && !data.emoji)
+      ? null
+      : {
+        text: data.state ?? null,
+        emoji_name: data.emoji?.name ?? null,
+        emoji_id: data.emoji?.id ?? null,
+        expires_at: null,
+      };
+    if (!this.bot && this.settings) this.settings.update('custom_status', payload);
+    return this.patchCustomStatus(payload ? { state: data.state, emoji: data.emoji } : null);
   }
 
   get activities() {
