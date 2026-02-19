@@ -128,6 +128,7 @@ class RESTMethods {
       }
 
       const send = chan => {
+        if (!chan) return reject(new Error('Cannot send message: channel is null or undefined (e.g. DM could not be created)'));
         if (content instanceof Array) {
           const messages = [];
           (function sendChunk(list, index) {

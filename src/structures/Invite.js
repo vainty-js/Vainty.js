@@ -26,7 +26,7 @@ class Invite {
      * unknown, this will be a PartialGuild object
      * @type {Guild|PartialGuild}
      */
-    this.guild = this.client.guilds.get(data.guild.id) || new PartialGuild(this.client, data.guild);
+    this.guild = data.guild ? (this.client.guilds.get(data.guild.id) || new PartialGuild(this.client, data.guild)) : null;
 
     /**
      * The code for this invite
@@ -50,13 +50,13 @@ class Invite {
      * The number of text channels the guild this invite goes to has
      * @type {number}
      */
-    this.textChannelCount = data.guild.text_channel_count;
+    this.textChannelCount = data.guild != null ? data.guild.text_channel_count : null;
 
     /**
      * The number of voice channels the guild this invite goes to has
      * @type {number}
      */
-    this.voiceChannelCount = data.guild.voice_channel_count;
+    this.voiceChannelCount = data.guild != null ? data.guild.voice_channel_count : null;
 
     /**
      * Whether or not this invite is temporary
@@ -95,13 +95,13 @@ class Invite {
      * If the channel is unknown, this will be a PartialGuildChannel object.
      * @type {GuildChannel|PartialGuildChannel}
      */
-    this.channel = this.client.channels.get(data.channel.id) || new PartialGuildChannel(this.client, data.channel);
+    this.channel = data.channel ? (this.client.channels.get(data.channel.id) || new PartialGuildChannel(this.client, data.channel)) : null;
 
     /**
      * The timestamp the invite was created at
      * @type {number}
      */
-    this.createdTimestamp = new Date(data.created_at).getTime();
+    this.createdTimestamp = data.created_at ? new Date(data.created_at).getTime() : 0;
   }
 
   /**
@@ -119,7 +119,7 @@ class Invite {
    * @readonly
    */
   get expiresTimestamp() {
-    return this.createdTimestamp + (this.maxAge * 1000);
+    return this.createdTimestamp + ((this.maxAge || 0) * 1000);
   }
 
   /**
